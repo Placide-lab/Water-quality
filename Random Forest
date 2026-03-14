@@ -1,0 +1,147 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, r2_score
+
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+
+
+# Load CSV 
+
+csv_path = r"C:\Users\Pl\Desktop\Water quality.csv"
+
+df = pd.read_csv(csv_path)
+
+print("First rows:")
+print(df.head())
+print("\nColumns:", df.columns.tolist())
+print("\nMissing values per column:")
+print(df.isna().sum())
+
+
+
+df = df.dropna().reset_index(drop=True)
+
+print("\nShape after dropping missing rows:", df.shape)
+
+
+
+target_col = "Turbidity"  
+
+X = df.drop(columns=[target_col])
+y = df[target_col]
+
+print("\nFeatures used for X:", X.columns.tolist())
+print("Target y:", target_col)
+
+
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
+
+print("\nTrain size:", X_train.shape[0], "Test size:", X_test.shape[0])
+
+
+
+models = {
+    "LinearRegression": LinearRegression(),
+    "RandomForest": RandomForestRegressor(
+        n_estimators=200,
+        random_state=42,
+        n_jobs=-1
+    ),
+    "GradientBoosting": GradientBoostingRegressor(
+        random_state=42
+    )
+}
+
+
+
+results = {}
+
+for name, model in models.items():
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+
+    mse = mean_squared_error(y_test, y_pred)
+    rmse = np.sqrt(mse)
+    r2 = r2_score(y_test, y_pred)
+
+    results[name] = {"MSE": mse, "RMSE": rmse, "R2": r2}
+
+    print(f"\n=== {name} ===")
+    print("MSE:", mse)
+    print("RMSE:", rmse)
+    print("R2:", r2)
+
+
+
+best_model_name = "RandomForest"
+best_model = models[best_model_name]
+
+best_model.fit(X_train, y_train)
+y_pred_best = best_model.predict(X_test)
+
+# ---- Plot 1: Actual vs Predicted ----
+plt.figure(figsize=(6, 6))
+plt.scatter(y_test, y_pred_best, alpha=0.7)
+min_val = min(y_test.min(), y_pred_best.min())
+max_val = max(y_test.max(), y_pred_best.max())
+plt.plot([min_val, max_val], [min_val, max_val], 'r--', label="Perfect fit")
+plt.xlabel("Actual Turbidity")
+plt.ylabel("Predicted Turbidity")
+plt.title(f"Actual vs Predicted ({best_model_name})")
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+
+# ---- Plot 2: Residuals vs Predicted ----
+residuals = y_test - y_pred_best
+
+plt.figure(figsize=(6, 4))
+plt.scatter(y_pred_best, residuals, alpha=0.7)
+plt.axhline(0, color='red', linestyle='--')
+plt.xlabel("Predicted Turbidity")
+plt.ylabel("Residuals (Actual - Predicted)")
+plt.title(f"Residuals vs Predicted ({best_model_name})")
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+
+
+
+best_model.fit(X, y)
+
+example_row = {
+    X.columns[0]: 50,    # Dosage (g/m3) example
+    X.columns[1]: 5.5,   # pH example
+    X.columns[2]: 5.5,   # TOC example
+    X.columns[3]: 0.3,   # Al example
+    X.columns[4]: 0.12   # UV example
+}
+
+example_input = pd.DataFrame([example_row])
+
+print("\nExample input:")
+print(example_input)
+
+predicted_turbidity = best_model.predict(example_input)
+print("\nPredicted Turbidity for example input:", predicted_turbidity[0])
+
+
+
+importances = best_model.feature_importances_
+feature_names = X.columns
+
+plt.figure(figsize=(6, 4))
+plt.bar(feature_names, importances)
+plt.ylabel("Importance")
+plt.title("Random Forest Feature Importance")
+plt.grid(axis="y", linestyle="--", alpha=0.5)
+plt.tight_layout()
+plt.show()
